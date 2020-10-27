@@ -27,48 +27,83 @@ public class Main {
     private static final String USER_NAME = "root";
     private static final String USER_PASSWORD = "root";
     private static final String DATABASE_URL = "jdbc:h2:file:/Users/guoxiaodong/Desktop/btw_test/java/sina-crawler/db/news";
+
     public static void main(String[] args) {
         Connection databaseConnection = createDatabaseConnection();
         List<String> unHandleUrl = selectUnHandleUrl(databaseConnection);
-
-
-
+//        insertIntoUnHandleUrl(databaseConnection,"https://sports.sina.cn/china/2020-10-26/detail-iiznctkc7803967.d.html?vt=4&pos=108");
 //        String url = "https://sina.cn";
 ////        String url = "https://sports.sina.cn/china/2020-10-26/detail-iiznctkc7803967.d.html?vt=4&pos=108";
 //        ArrayList<String> unHandleUrl = new ArrayList<>(Collections.singletonList(url));
 //        Set<String> handleUrl = new HashSet<>();
 //        // https://sports.sina.cn/china/2020-10-26/detail-iiznctkc7803967.d.html?vt=4&pos=108
-//        while (true) {
-//            if (unHandleUrl.isEmpty()) {
-//                break;
-//            }
-//            String link = unHandleUrl.remove(unHandleUrl.size() - 1);
-//            if (!handleUrl.contains(link)) {
-//                handleUrl.add(link);
-//                System.out.println("link 1 = " + link);
-//                Document document = getHtmlAndParseByUrl(link);
-//                Set<String> newsHrefAll = getPageNewsHrefAll(document);
-//                unHandleUrl.addAll(newsHrefAll);
-//                parseNewsDetailAndSave(document);
-//            }
-//
-//        }
+        while (unHandleUrl.size() != 0) {
+            String link = unHandleUrl.get(0);
+            if (!hasHandleUrl(databaseConnection, link)) {
+                Document document = getHtmlAndParseByUrl(link);
+                insertIntoHandleUrl(databaseConnection, link);
+                deleteUnHandleUrlByUrl(databaseConnection, link);
+                Set<String> newsHrefAll = getPageNewsHrefAll(document);
+                for (String newsHref : newsHrefAll) {
+                    insertIntoUnHandleUrl(databaseConnection, newsHref);
+                }
+                parseNewsDetailAndSave(document);
+            }
+            unHandleUrl = selectUnHandleUrl(databaseConnection);
+        }
 
     }
-    private static void insertIntoUnHandleUrl(Connection databaseConnection,String url) {
+
+    private static void insertIntoUnHandleUrl(Connection databaseConnection, String url) {
         try {
-            PreparedStatement statement = databaseConnection.prepareStatement("SELECT * FROM UN_HANDLE_URL;");
-            ResultSet resultSet = statement.executeQuery();
+            PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO UN_HANDLE_URL (URL) values ( ? );");
+            statement.setString(1, url);
+            statement.executeUpdate();
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
     }
+
+    private static void insertIntoHandleUrl(Connection databaseConnection, String url) {
+        try {
+            PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO HANDLE_URL (URL) values ( ? );");
+            statement.setString(1, url);
+            statement.executeUpdate();
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+    }
+
+    private static void deleteUnHandleUrlByUrl(Connection databaseConnection, String url) {
+        try {
+            PreparedStatement statement = databaseConnection.prepareStatement("DELETE FROM UN_HANDLE_URL WHERE (URL = ?);");
+            statement.setString(1, url);
+            statement.executeUpdate();
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+    }
+
+    private static boolean hasHandleUrl(Connection databaseConnection, String url) {
+        try {
+            PreparedStatement statement = databaseConnection.prepareStatement("SELECT COUNT(*) FROM HANDLE_URL WHERE URL = ?;");
+            statement.setString(1, url);
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                return resultSet.getInt(1) != 0;
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+        return false;
+    }
+
     private static List<String> selectUnHandleUrl(Connection databaseConnection) {
         List<String> stringList = new ArrayList<>();
         try {
             PreparedStatement statement = databaseConnection.prepareStatement("SELECT * FROM UN_HANDLE_URL;");
             ResultSet resultSet = statement.executeQuery();
-            while (resultSet.next()){
+            while (resultSet.next()) {
                 stringList.add(resultSet.getString(1));
             }
         } catch (SQLException throwables) {
