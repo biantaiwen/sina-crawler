@@ -1,13 +1,13 @@
 -- 未处理的url
 CREATE TABLE UN_HANDLE_URL
 (
-    URL VARCHAR(2000)
+    URL TEXT
 );
 
 -- 已处理的url
 CREATE TABLE HANDLE_URL
 (
-    URL VARCHAR(2000)
+    URL TEXT
 );
 
 -- 新闻表

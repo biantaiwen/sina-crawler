@@ -1,5 +1,6 @@
 package com.qxz.sina.crawler;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -28,15 +29,10 @@ public class Main {
     private static final String USER_PASSWORD = "root";
     private static final String DATABASE_URL = "jdbc:h2:file:/Users/guoxiaodong/Desktop/btw_test/java/sina-crawler/db/news";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws SQLException {
+
         Connection databaseConnection = createDatabaseConnection();
         List<String> unHandleUrl = selectUnHandleUrl(databaseConnection);
-//        insertIntoUnHandleUrl(databaseConnection,"https://sports.sina.cn/china/2020-10-26/detail-iiznctkc7803967.d.html?vt=4&pos=108");
-//        String url = "https://sina.cn";
-////        String url = "https://sports.sina.cn/china/2020-10-26/detail-iiznctkc7803967.d.html?vt=4&pos=108";
-//        ArrayList<String> unHandleUrl = new ArrayList<>(Collections.singletonList(url));
-//        Set<String> handleUrl = new HashSet<>();
-//        // https://sports.sina.cn/china/2020-10-26/detail-iiznctkc7803967.d.html?vt=4&pos=108
         while (unHandleUrl.size() != 0) {
             String link = unHandleUrl.get(0);
             if (!hasHandleUrl(databaseConnection, link)) {
@@ -47,71 +43,73 @@ public class Main {
                 for (String newsHref : newsHrefAll) {
                     insertIntoUnHandleUrl(databaseConnection, newsHref);
                 }
-                parseNewsDetailAndSave(document);
+                parseNewsDetailAndSave(databaseConnection, document, link);
             }
             unHandleUrl = selectUnHandleUrl(databaseConnection);
         }
 
     }
 
-    private static void insertIntoUnHandleUrl(Connection databaseConnection, String url) {
-        try {
-            PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO UN_HANDLE_URL (URL) values ( ? );");
+    private static void insertIntoUnHandleUrl(Connection databaseConnection, String url) throws SQLException {
+        try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO UN_HANDLE_URL (URL) values ( ? );")) {
             statement.setString(1, url);
             statement.executeUpdate();
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
         }
     }
 
-    private static void insertIntoHandleUrl(Connection databaseConnection, String url) {
-        try {
-            PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO HANDLE_URL (URL) values ( ? );");
-            statement.setString(1, url);
+    private static void insertIntoNews(Connection databaseConnection, News news) throws SQLException {
+
+        try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO NEWS (URL, TITLE, CONTENT, CREATE_AT, UPDATE_AT) VALUES (?, ?, ?, NOW(), NOW());")) {
+            statement.setString(1, news.url);
+            statement.setString(2, news.title);
+            statement.setString(3, news.content);
             statement.executeUpdate();
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
         }
     }
 
-    private static void deleteUnHandleUrlByUrl(Connection databaseConnection, String url) {
-        try {
-            PreparedStatement statement = databaseConnection.prepareStatement("DELETE FROM UN_HANDLE_URL WHERE (URL = ?);");
+    private static void insertIntoHandleUrl(Connection databaseConnection, String url) throws SQLException {
+        try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO HANDLE_URL (URL) values ( ? );")) {
             statement.setString(1, url);
             statement.executeUpdate();
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
         }
     }
 
-    private static boolean hasHandleUrl(Connection databaseConnection, String url) {
-        try {
-            PreparedStatement statement = databaseConnection.prepareStatement("SELECT COUNT(*) FROM HANDLE_URL WHERE URL = ?;");
+    private static void deleteUnHandleUrlByUrl(Connection databaseConnection, String url) throws SQLException {
+        try (PreparedStatement statement = databaseConnection.prepareStatement("DELETE FROM UN_HANDLE_URL WHERE (URL = ?);")) {
             statement.setString(1, url);
-            ResultSet resultSet = statement.executeQuery();
+            statement.executeUpdate();
+        }
+    }
+
+    private static boolean hasHandleUrl(Connection databaseConnection, String url) throws SQLException {
+        ResultSet resultSet = null;
+        try (PreparedStatement statement = databaseConnection.prepareStatement("SELECT COUNT(*) FROM HANDLE_URL WHERE URL = ?;")) {
+            statement.setString(1, url);
+            resultSet = statement.executeQuery();
             if (resultSet.next()) {
                 return resultSet.getInt(1) != 0;
             }
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
         }
         return false;
     }
 
-    private static List<String> selectUnHandleUrl(Connection databaseConnection) {
+    private static List<String> selectUnHandleUrl(Connection databaseConnection) throws SQLException {
         List<String> stringList = new ArrayList<>();
-        try {
-            PreparedStatement statement = databaseConnection.prepareStatement("SELECT * FROM UN_HANDLE_URL;");
-            ResultSet resultSet = statement.executeQuery();
+        try (PreparedStatement statement = databaseConnection.prepareStatement("SELECT * FROM UN_HANDLE_URL;");
+             ResultSet resultSet = statement.executeQuery();
+        ) {
             while (resultSet.next()) {
                 stringList.add(resultSet.getString(1));
             }
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
         }
         return stringList;
     }
 
+    @SuppressFBWarnings("DMI_CONSTANT_DB_PASSWORD")
     private static Connection createDatabaseConnection() {
         try {
             return DriverManager.getConnection(DATABASE_URL, USER_NAME, USER_PASSWORD);
@@ -143,19 +141,30 @@ public class Main {
     }
 
 
-    private static void parseNewsDetailAndSave(Document document) {
+    private static void parseNewsDetailAndSave(Connection databaseConnection, Document document, String url) throws SQLException {
         System.out.println("isNewsDetailPage(document) = " + isNewsDetailPage(document));
         if (isNewsDetailPage(document)) {
-            parseNewsDetail(document);
+            News news = parseNewsDetail(document);
+            if (news != null) {
+                news.setUrl(url);
+                insertIntoNews(databaseConnection, news);
+            }
         }
     }
 
-    private static void parseNewsDetail(Document document) {
+    private static News parseNewsDetail(Document document) {
         Elements article = document.getElementsByTag("article");
         Element firstElement = article.first();
         if (firstElement != null) {
-            System.out.println("firstElement.text() = " + firstElement.text());
+            String title = firstElement.child(0).text();
+            Elements contentElement = firstElement.select("section[class*=art_content]");
+            String content = "";
+            if (contentElement.size() != 0) {
+                content = contentElement.get(0).text();
+            }
+            return new News(title, content);
         }
+        return null;
     }
 
     private static boolean isNewsDetailPage(Document document) {
