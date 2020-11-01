@@ -18,30 +18,35 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-public class Crawler {
+public class Crawler extends Thread {
     private final CrawlerDao dao;
 
     public Crawler(CrawlerDao dao) {
         this.dao = dao;
     }
 
-    public void run() throws SQLException {
-
-        List<String> unHandleUrl = dao.selectUnHandleUrl();
-        while (unHandleUrl.size() != 0) {
-            String link = unHandleUrl.get(0);
-            if (!dao.hasHandleUrl(link)) {
-                Document document = getHtmlAndParseByUrl(link);
-                dao.insertIntoHandleUrl(link);
-                dao.deleteUnHandleUrlByUrl(link);
-                Set<String> newsHrefAll = getPageNewsHrefAll(document);
-                for (String newsHref : newsHrefAll) {
-                    dao.insertIntoUnHandleUrl(newsHref);
+    @Override
+    public void run() {
+        try {
+            List<String> unHandleUrl = dao.selectUnHandleUrl();
+            while (unHandleUrl.size() != 0) {
+                String link = unHandleUrl.get(0);
+                if (!dao.hasHandleUrl(link)) {
+                    Document document = getHtmlAndParseByUrl(link);
+                    dao.insertIntoHandleUrl(link);
+                    dao.deleteUnHandleUrlByUrl(link);
+                    Set<String> newsHrefAll = getPageNewsHrefAll(document);
+                    for (String newsHref : newsHrefAll) {
+                        dao.insertIntoUnHandleUrl(newsHref);
+                    }
+                    parseNewsDetailAndSave(document, link);
                 }
-                parseNewsDetailAndSave(document, link);
+                unHandleUrl = dao.selectUnHandleUrl();
             }
-            unHandleUrl = dao.selectUnHandleUrl();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
+
     }
 
     public static void main(String[] args) throws SQLException {
@@ -69,7 +74,7 @@ public class Crawler {
 
 
     private void parseNewsDetailAndSave(Document document, String url) throws SQLException {
-        System.out.println("isNewsDetailPage(document) = " + isNewsDetailPage(document));
+
         if (isNewsDetailPage(document)) {
             News news = parseNewsDetail(document);
             if (news != null) {
@@ -96,7 +101,6 @@ public class Crawler {
 
     private static boolean isNewsDetailPage(Document document) {
         Elements article = document.getElementsByTag("article");
-        System.out.println("article.size() = " + article.size());
         return article.size() != 0;
     }
 
