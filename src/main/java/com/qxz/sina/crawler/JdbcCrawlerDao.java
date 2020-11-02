@@ -33,8 +33,8 @@ public class JdbcCrawlerDao implements CrawlerDao {
 
     @Override
     public String getNextLinkThenDelete() throws SQLException {
-        try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO UN_HANDLE_URL (URL) values ( ? );")) {
-            ResultSet resultSet = statement.executeQuery();
+        try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO UN_HANDLE_URL (URL) values ( ? );");
+             ResultSet resultSet = statement.executeQuery()) {
             if (resultSet.next()) {
                 String url = resultSet.getString(1);
                 deleteUnHandleUrlByUrl(url);
