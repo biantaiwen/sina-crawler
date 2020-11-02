@@ -32,6 +32,19 @@ public class JdbcCrawlerDao implements CrawlerDao {
     }
 
     @Override
+    public String getNextLinkThenDelete() throws SQLException {
+        try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO UN_HANDLE_URL (URL) values ( ? );")) {
+            ResultSet resultSet = statement.executeQuery();
+            if (resultSet.next()) {
+                String url = resultSet.getString(1);
+                deleteUnHandleUrlByUrl(url);
+                return url;
+            }
+            return null;
+        }
+    }
+
+    @Override
     public void insertIntoUnHandleUrl(String url) throws SQLException {
         try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO UN_HANDLE_URL (URL) values ( ? );")) {
             statement.setString(1, url);
@@ -50,7 +63,7 @@ public class JdbcCrawlerDao implements CrawlerDao {
     }
 
     @Override
-    public void insertIntoHandleUrl(String url) throws SQLException {
+    public synchronized void insertIntoHandleUrl(String url) throws SQLException {
         try (PreparedStatement statement = databaseConnection.prepareStatement("INSERT INTO HANDLE_URL (URL) values ( ? );")) {
             statement.setString(1, url);
             statement.executeUpdate();

@@ -5,6 +5,8 @@ import java.util.List;
 
 public interface CrawlerDao {
 
+    String getNextLinkThenDelete() throws SQLException;
+
     void insertIntoUnHandleUrl(String url) throws SQLException;
 
     void insertIntoNews(News news) throws SQLException;

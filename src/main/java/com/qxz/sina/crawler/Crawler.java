@@ -14,7 +14,6 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -28,20 +27,17 @@ public class Crawler extends Thread {
     @Override
     public void run() {
         try {
-            List<String> unHandleUrl = dao.selectUnHandleUrl();
-            while (unHandleUrl.size() != 0) {
-                String link = unHandleUrl.get(0);
+            String link;
+            while ((link = dao.getNextLinkThenDelete()) != null) {
                 if (!dao.hasHandleUrl(link)) {
                     Document document = getHtmlAndParseByUrl(link);
                     dao.insertIntoHandleUrl(link);
-                    dao.deleteUnHandleUrlByUrl(link);
                     Set<String> newsHrefAll = getPageNewsHrefAll(document);
                     for (String newsHref : newsHrefAll) {
                         dao.insertIntoUnHandleUrl(newsHref);
                     }
                     parseNewsDetailAndSave(document, link);
                 }
-                unHandleUrl = dao.selectUnHandleUrl();
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

@@ -25,6 +25,17 @@ public class MybatisCrawlerDao implements CrawlerDao {
     }
 
     @Override
+    public synchronized String getNextLinkThenDelete() {
+        try (SqlSession sqlSession = sqlSessionFactory.openSession(true)) {
+            String url = sqlSession.selectOne("com.qxz.sina.crawler.MyMapper.unHandleUrlOne");
+            if (url != null) {
+                deleteUnHandleUrlByUrl(url);
+            }
+            return url;
+        }
+    }
+
+    @Override
     public void insertIntoUnHandleUrl(String url) {
         insertIntoUrl(url, "UN_HANDLE_URL");
     }
@@ -37,7 +48,7 @@ public class MybatisCrawlerDao implements CrawlerDao {
     }
 
     @Override
-    public void insertIntoHandleUrl(String url) {
+    public synchronized void insertIntoHandleUrl(String url) {
         insertIntoUrl(url, "HANDLE_URL");
     }
 
