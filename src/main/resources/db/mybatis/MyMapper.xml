@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.qxz.sina.crawler.MyMapper">
+    <select id="unHandleUrl" resultType="String">
+        SELECT URL
+        FROM UN_HANDLE_URL
+    </select>
+    <select id="unHandleUrlOne" resultType="String">
+        SELECT URL
+        FROM UN_HANDLE_URL
+        LIMIT 1
+    </select>
+    <select id="handleUrlCountByUrl" resultType="int" parameterType="String">
+        SELECT COUNT(URL)
+        FROM HANDLE_URL
+        WHERE URL = #{url};
+    </select>
+    <delete id="deleteUnHandleByUrl" parameterType="String">
+        DELETE
+        FROM UN_HANDLE_URL
+        WHERE URL = #{url}
+    </delete>
+    <insert id="insertUrl" parameterType="HashMap">
+        INSERT INTO
+        <choose>
+            <when test="tableName == 'UN_HANDLE_URL'">
+                UN_HANDLE_URL
+            </when>
+            <otherwise>
+                HANDLE_URL
+            </otherwise>
+        </choose>
+        (URL)
+        VALUES (#{URL})
+    </insert>
+    <insert id="insertNews" parameterType="com.qxz.sina.crawler.News">
+        INSERT INTO NEWS(URL, TITLE, CONTENT, CREATE_AT, UPDATE_AT)
+        VALUES (#{url}, #{title}, #{content}, now(), now())
+    </insert>
+</mapper>

@@ -15,4 +15,4 @@ target/
 bin/
 
 # db
-db/
+/db/
